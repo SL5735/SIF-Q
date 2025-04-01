@@ -9,30 +9,30 @@ from PIL import Image
 
 # ================= 参数设置 =================
 color = "blue"
-m = 2  ###########去除outlier的多少
-version = f"{color}-noT-S-pseudoCAP-m{m}-de3.0-avg_show"  # 可修改版本号
+m = 2  ###########超参数1
+version = f"{color}-noT-S-pseudoCAP-m{m}-de3.0-avg_show"  
 
-# 【修改】增加R循环变量列表，原来固定R=10改为循环（可根据需要修改R_values）
-R_values = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 110, 120, 130, 140, 150]  # 示例R值
+
+R_values = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 110, 120, 130, 140, 150]  # 超参数2
 
 A = np.array([95, 60, 20, 4, 0])
 T_values = np.arange(1.0, 1.3, 0.1)  # T 从 1.0 到 1.2，步长 0.1
 
-# 其他参数
+
 file = 'human-1J-N'
-tree = f'treecut-unique'  # 【修改】不在文件夹名中添加R
-count = f"{file}_{color}_{tree}_T_E"  # 【修改】同上
+tree = f'treecut-unique' 
+count = f"{file}_{color}_{tree}_T_E"  
 
 # ================= 路径设置 =================
-# 原始图片所在路径（保证图片路径正确）
+
 base_path = r'C:\Users\User\Desktop\test_cns\ALL-tree-T\human\1J-N\human_dpienhanced'
 deal_path = r'C:\Users\User\Desktop\test_cns\ALL-tree-T\human\1J-N'
 
-# 整合输出目录：所有输出文件将存放于 try_{version} 文件夹下
+
 output_dir = os.path.join(deal_path, f"try_{version}")
 os.makedirs(output_dir, exist_ok=True)
 
-# 在 output_dir 下建立三个子文件夹：tree（保存第一部分结果）、show（保存第二部分部分结果与excel）、fit（保存拟合图）
+# 
 tree_dir = os.path.join(deal_path, f"{color}_{tree}")
 show_dir = os.path.join(output_dir, count)
 fit_dir = os.path.join(output_dir, f"fit{count}")
@@ -40,17 +40,17 @@ fit_dir = os.path.join(output_dir, f"fit{count}")
 for path in [tree_dir, show_dir, fit_dir]:
     os.makedirs(path, exist_ok=True)
 
-# 新增：第一部分额外保存路径，专用于保存蓝色边与白色C图前景点覆盖后的结果
+# 
 show_tree_dir = r'C:\Users\User\Desktop\test_cns\ALL-tree-T\human\1J-N\show-tree'
 os.makedirs(show_tree_dir, exist_ok=True)
 
 ###############################################
-# ================= 新增：对每个 F（A中的每个元素）读取 B 图并保存统计信息 =================
+# =================读取 B 图并保存统计信息 =================
 excel_B_stats_path = os.path.join(deal_path, f'B_stats_{color}_{tree}.xlsx')
-if not os.path.exists(excel_B_stats_path):   # 【NEW】如果已存在，则跳过B图统计部分
+if not os.path.exists(excel_B_stats_path):   # 
     with pd.ExcelWriter(excel_B_stats_path, engine='xlsxwriter') as writer:
         for F in A:
-            # B 图文件名，按照原代码中CD的规则，C1对应B图
+          
             image_b_path = os.path.join(deal_path, f'{F}%_c2.tif')
             try:
                 image_b = Image.open(image_b_path).convert("L")
@@ -59,7 +59,7 @@ if not os.path.exists(excel_B_stats_path):   # 【NEW】如果已存在，则跳
                 print(f"⚠ B 图加载失败: {image_b_path}，错误信息: {e}")
                 continue
 
-            # 这里选取非零像素（也可以根据需要对全部矩阵统计）
+            # 
             positive_values = image_b_array[image_b_array > 0]
             if positive_values.size == 0:
                 stats_dict = {
@@ -79,11 +79,9 @@ if not os.path.exists(excel_B_stats_path):   # 【NEW】如果已存在，则跳
                 max_val = np.max(positive_values)
                 mean_val = np.mean(positive_values)
                 median_val = np.median(positive_values)
-                # 计算众数（使用scipy.stats.mode，注意新版scipy返回ModeResult对象）
                 mode_result = stats.mode(positive_values, nan_policy='omit')
                 mode_val = np.atleast_1d(mode_result.mode)[0] if np.atleast_1d(mode_result.count)[0] > 0 else None
                 percentiles = np.percentile(positive_values, [25, 50, 75, 95])
-                # 95-100位点的值区间：这里取 95%分位数 到最大值
                 range_95_100 = f"{percentiles[3]}-{max_val}"
                 stats_dict = {
                     "最小值": min_val,
@@ -105,60 +103,55 @@ if not os.path.exists(excel_B_stats_path):   # 【NEW】如果已存在，则跳
 else:
     print(f"✅ 检测到已存在的 B 图统计文件，跳过统计处理: {excel_B_stats_path}")
 
-# ================= 定义综合保存第二部分结果的Excel文件 =================
-# 此处修改：不再每个R单独保存一个Excel文件，而是将每个R结果写入同一Excel文件的不同sheet中
+# =================Excel文件 =================
+
 excel_show_all_path = os.path.join(show_dir, f'analysis_results_{count}.xlsx')
 
-# 创建ExcelWriter对象，用于保存所有R的结果到不同的sheet
 with pd.ExcelWriter(excel_show_all_path, engine='openpyxl') as writer_all:
 
-    # ##########===== 外层循环：对每个R值进行处理 =====
+    # ##########===== 外层循环=====
     for R in R_values:
-        print(f"\n==== 开始处理 R = {R} ====")
         
-        # 【修改】Excel保存路径中添加R标识，仅用于第一部分tree文件（独立保存）
+
         excel_tree_path = os.path.join(tree_dir, f'edge_analysis_{color}_{R}.xlsx')
-        # ================= 第一部分：生成 tree 文件（Delaunay 三角剖分及边过滤） =================
-        # 【NEW】如果该R对应的tree结果已存在，则跳过第一部分的计算
+        # 
         if os.path.exists(excel_tree_path):
             print(f"✅ 检测到已存在的第一部分结果文件，跳过R={R}的第一部分处理: {excel_tree_path}")
         else:
-            print("----- 开始第一部分处理（tree文件） -----")
+         
             with pd.ExcelWriter(excel_tree_path, engine='xlsxwriter') as writer:
                 for F in A:
                     print(f"Processing F={F} ...")
                     
-                    # 读取 C 图（灰度图）
+                    # 读取 C 图
                     image_c_path = os.path.join(base_path, f'T3-ZLQ {F}% dpi_masks.png')
                     imgC = cv2.imread(image_c_path, cv2.IMREAD_GRAYSCALE)
                     if imgC is None:
                         print(f"⚠ C 图加载失败: {image_c_path}")
                         continue
 
-                    # 二值化处理
+                 
                     _, binaryC = cv2.threshold(imgC, 0, 255, cv2.THRESH_BINARY)
-                    # 获取所有非零点（注意：np.where 返回 (row, col) 顺序）
+                    
                     C_points = np.column_stack(np.where(binaryC > 0))
                     if C_points.shape[0] < 3:
-                        print(f"⚠ C 图点数不足，无法计算 Delaunay: {image_c_path}")
+                        print(f"⚠  {image_c_path}")
                         continue
 
-                    # Delaunay 三角剖分
+    
                     tri = Delaunay(C_points)
                     simplices = tri.simplices
                     edges = []
                     for simplex in simplices:
-                        # 每个三角形有 3 条边
+                      
                         edges.extend([[simplex[i], simplex[(i+1)%3]] for i in range(3)])
                     edges = np.array(edges)
-                    edges.sort(axis=1)  # 按顶点索引排序
-                    edges = np.unique(edges, axis=0)  # 去重
+                    edges.sort(axis=1)  
+                    edges = np.unique(edges, axis=0) 
 
-                    # 计算所有边的长度
                     edge_vectors = C_points[edges[:, 0]] - C_points[edges[:, 1]]
                     edge_lengths = np.linalg.norm(edge_vectors, axis=1)
-                    
-                    # 统计计算
+         
                     if edge_lengths.size == 0:
                         statistics = {
                             "最小值": 0, "最大值": 0, "均值": 0, "中位数": 0, "众数": 0,
@@ -181,60 +174,52 @@ with pd.ExcelWriter(excel_show_all_path, engine='openpyxl') as writer_all:
                         }
                     df_statistics = pd.DataFrame([statistics])
                     
-                    # 设定剪枝阈值，并过滤边
+
                     threshold = R * statistics["均值"] if statistics["均值"] > 0 else 0
                     filtered_mask = edge_lengths <= threshold
                     filtered_edges = edges[filtered_mask]
-                    # 定义颜色字典（BGR格式）
+
                     COLORS = {
                         "red": (0, 0, 255),
                         "green": (0, 255, 0),
                         "blue": (255, 0, 0)
                     }
-
-                    # 在原图上绘制过滤后的边（原版，用当前color绘制）
                     img_plot = cv2.cvtColor(binaryC, cv2.COLOR_GRAY2BGR)
                     for edge in filtered_edges:
-                        pt1 = tuple(C_points[edge[0]][::-1].astype(int))  # (row,col)转换为(x,y)
+                        pt1 = tuple(C_points[edge[0]][::-1].astype(int)) 
                         pt2 = tuple(C_points[edge[1]][::-1].astype(int))
                         cv2.line(img_plot, pt1, pt2,  COLORS[color], 1)
-                    # 保存原版过滤结果
+
                     output_filtered_path = os.path.join(tree_dir, f'Filtered_E{F}_{R}.png')
                     cv2.imwrite(output_filtered_path, img_plot)
                     print(f"✅ Filtered_E 文件已保存: {output_filtered_path}")
                     
-                    # 【新增】复制一份，使用蓝色边，并在剪枝后将 C 图的前景点以白色覆盖
+
                     img_plot_blue = cv2.cvtColor(binaryC, cv2.COLOR_GRAY2BGR)
                     for edge in filtered_edges:
                         pt1 = tuple(C_points[edge[0]][::-1].astype(int))
                         pt2 = tuple(C_points[edge[1]][::-1].astype(int))
                         cv2.line(img_plot_blue, pt1, pt2,  COLORS["blue"], 1)
-                    # 将 C 图前景点以白色覆盖
+            
                     for pt in C_points:
                         pt_xy = tuple(pt[::-1].astype(int))
                         cv2.circle(img_plot_blue, pt_xy, 1, (255,255,255), -1)
-                    # 保存新生成的图到 show_tree_dir
+            
                     output_blue_path = os.path.join(show_tree_dir, f'Filtered_E_blue_{F}_{R}.png')
                     cv2.imwrite(output_blue_path, img_plot_blue)
                     print(f"✅ Filtered_E_blue 文件已保存: {output_blue_path}")
                     
-                    # 将统计数据写入 Excel 的对应 sheet 中
+                   
                     df_statistics.to_excel(writer, sheet_name=f'F_{F}', index=False)
                     print(f"✅ 统计数据已写入 Excel (Sheet: F_{F})")
 
-            print("🎉 第一部分处理完成！")
         
         # ================= 第二部分：异常值处理、图像处理、计算指标 ================= 
         print("\n----- 开始第二部分处理（show与fit文件） -----")
     
-        # 定义去除异常值的函数：利用四分位数方法（IQR）计算上下界限，返回满足条件的索引列表
+        # 
         def remove_outlier_indices(values, m):
-            """
-            利用四分位数方法计算上下界限，返回满足 [Q1 - m*IQR, Q3 + m*IQR] 条件的索引列表
-            :param values: 待检测的一维数组
-            :param m: 控制异常值剔除的系数（默认1.5）
-            :return: 符合条件的索引数组
-            """
+
             values = np.array(values)
             Q1 = np.percentile(values, 25)
             Q3 = np.percentile(values, 75)
@@ -243,78 +228,78 @@ with pd.ExcelWriter(excel_show_all_path, engine='openpyxl') as writer_all:
             upper_bound = Q3 + m * IQR
             return np.where((values >= lower_bound) & (values <= upper_bound))[0]
     
-        # 用于记录每个 F 的计算结果（当前R的结果）
-        all_results = []      # 保存 F、R、SIF 以及其他指标
-        Z_values = []         # 用于存储每个 F 对应的 SIF（结构指标）值，用于拟合
-        struct_eff_list = []  # 存储每个 F 的 structural_efficiency
-        base_act_list = []    # 存储每个 F 的 baseline_activity_ratio
-        avg_expr_list = []    # 存储每个 F 的 X_set 平均表达量
+        
+        all_results = []     
+        Z_values = []         
+        struct_eff_list = []  
+        base_act_list = []   
+        avg_expr_list = []    
     
         for F in A:
             print(f"Processing F={F} ...")
             
-            # 1. 读取 C 图（灰度图），二值化后提取前景点（C点集）
+            
             image_c_path = os.path.join(base_path, f'T3-ZLQ {F}% dpi_masks.png')
             imgC = cv2.imread(image_c_path, cv2.IMREAD_GRAYSCALE)
             if imgC is None:
-                print(f"⚠ C 图加载失败: {image_c_path}")
+                print(f"⚠ {image_c_path}")
                 continue
-            # 二值化（阈值0，所有大于0的像素视为前景）
+        
             _, binaryC = cv2.threshold(imgC, 0, 255, cv2.THRESH_BINARY)
             C_points = np.column_stack(np.where(binaryC > 0))
             if C_points.shape[0] == 0:
-                print(f"⚠ C 图未检测到前景点: {image_c_path}")
+                print(f"⚠  {image_c_path}")
                 continue
     
-            # 2. 读取 B 图（灰度图），并利用 IQR 方法去除异常值
+      
             image_b_path = os.path.join(deal_path, f'{F}%_c2.tif')
             try:
                 image_b = Image.open(image_b_path).convert("L")
                 image_b_array = np.array(image_b, dtype=np.float32)
             except Exception as e:
-                print(f"⚠ B 图加载失败: {e}")
+                print(f"⚠  {e}")
                 continue
-            # 提取 B 图中所有非零（前景）像素及其坐标
+           
             B_indices = np.column_stack(np.where(image_b_array > 0))
             B_values = image_b_array[image_b_array > 0]
             if B_values.size == 0:
-                print(f"⚠ B 图未检测到前景点: {image_b_path}")
+                print(f" {image_b_path}")
                 continue
-            # 得到有效像素的索引
+          
             valid_indices = remove_outlier_indices(B_values, m)
-            # 同时获取被剔除的异常点索引（取反）
+         
             all_indices = np.arange(B_values.size)
             outlier_indices = np.setdiff1d(all_indices, valid_indices)
-            # 构造过滤后的 B 图：仅保留有效像素，其余置为0
+           
             filtered_B_image = np.zeros_like(image_b_array)
             valid_B_coords = B_indices[valid_indices]
             filtered_B_image[tuple(valid_B_coords.T)] = image_b_array[tuple(valid_B_coords.T)]
             
-            # # 【新增】在原 B 图上，将被剔除的异常点标记为黄色（BGR: (0,255,255)）
+            
             # image_b_color = cv2.imread(image_b_path, cv2.IMREAD_COLOR)
             # B_image_color = cv2.cvtColor(np.array(image_b_color), cv2.COLOR_GRAY2BGR)
             # outlier_B_coords = B_indices[outlier_indices]
             # for pt in outlier_B_coords:
             #     pt_xy = tuple(pt[::-1].astype(int))
             #     cv2.circle(B_image_color, pt_xy, 1, (0,255,255), -1)
-            # # 保存 B 图过滤异常后的图像（fliter图），保存为高清png
+            #
             # output_B_filter = os.path.join(show_dir, f'B_filter_{F}_2.png')
             # cv2.imwrite(output_B_filter, B_image_color)
-            # print(f"✅ B_filter 文件已保存: {output_B_filter}")
+            #
             
-            # 【修改】直接读取彩色的 B 图，并在上面标记异常点为黄色（BGR: (0,255,255)）
+            
             B_image_color = cv2.imread(image_b_path, cv2.IMREAD_COLOR)
             outlier_B_coords = B_indices[outlier_indices]
             for pt in outlier_B_coords:
                 pt_xy = tuple(pt[::-1].astype(int))
                 cv2.circle(B_image_color, pt_xy, 1, (0,255,255), -1)
-            # 保存 B 图过滤异常后的图像（filter图），保存为高清png
+           
             output_B_filter = os.path.join(show_dir, f'B_filter_{F}_2.png')
             cv2.imwrite(output_B_filter, B_image_color)
             print(f"✅ B_filter 文件已保存: {output_B_filter}")
 
     
-            # 3. 利用过滤后的 B 图构造高亮区域（仅在 G 通道显示），并与 C 图叠加生成 D 图
+            #
             highlight_b_array = np.stack([np.zeros_like(filtered_B_image),
                                           filtered_B_image,
                                           np.zeros_like(filtered_B_image)], axis=-1)
